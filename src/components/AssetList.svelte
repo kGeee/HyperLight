@@ -1,12 +1,31 @@
 <script>
-  import { selectedAsset, assets } from '../stores/app.js';
+  import { selectedAsset, assets, refreshPrices } from '../stores/app.js';
+  import { onMount } from 'svelte';
+
+  
+
+  
+  const assetList = ['BTC', 'ETH', 'SOL', 'XPL'];
+
+    // fetch once on mount
+  onMount(() => {
+    
+    refreshPrices();
+    const interval = setInterval(refreshPrices, 5000); // refresh every 5s
+    return () => clearInterval(interval);
+  });
+
+
+  
+
+  // 
 
   function formatPrice(price) {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(price);
-  }
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+      }).format(price);
+    }
 
   function formatPercent(change) {
     const sign = change >= 0 ? '+' : '';
@@ -18,6 +37,8 @@
       ? 'w-full p-4 rounded-lg transition-all bg-gradient-to-r from-blue-600 from-opacity-20 to-purple-600 to-opacity-20 border border-blue-500 border-opacity-30'
       : 'w-full p-4 rounded-lg transition-all hover:bg-slate-800 hover:bg-opacity-30';
   }
+
+  
 </script>
 
 <div class="w-80 bg-black bg-opacity-10 backdrop-blur-xl border-r border-slate-700 border-opacity-30 p-6">

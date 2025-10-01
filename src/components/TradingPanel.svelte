@@ -1,5 +1,5 @@
 <script>
-  import { orderType, side, amount, price, selectedAsset } from '../stores/app.js';
+  import { orderType, side, amount, price, selectedAsset,getL2Book } from '../stores/app.js';
 
   function handleTrade() {
     console.log('Executing trade:', {
@@ -27,6 +27,7 @@
   };
 
   $: orderBook = generateOrderBook();
+  const ob = getL2Book();
 
   // Dynamic classes
   $: buySideClasses = $side === 'buy'
