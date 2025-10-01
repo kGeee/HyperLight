@@ -29,7 +29,7 @@ export const assets = writable([
 export async function refreshPrices() {
   try {
     const allMids = await infoClient.allMids(); // your function that returns { BTC: 67000, ETH: 2850, ... }
-
+    
     assets.update(current =>
       current.map(asset => {
         const newPrice = allMids[asset.symbol];
@@ -43,11 +43,12 @@ export async function refreshPrices() {
   }
 }
 
-export async function getL2Book(){
+export async function getL2Book(symbol = 'ETH'){
   try {
-    const res = await infoClient.l2Book({ coin: "ETH", nSigFigs: 4 });
-    console.log('L2 book bids:', res.levels[0]);
-    console.log('L2 book asks:', res.levels[1]);
+    const res = await infoClient.l2Book({ coin: symbol, nSigFigs: 4 });
+    // console.log('L2 book bids for ', symbol, ':',res.levels[0]);
+    // console.log('L2 book asks for ', symbol, ':', res.levels[1]);
+    return res
   } catch (err) {
     console.error('Failed to fetch prices:', err);
   }

@@ -53,12 +53,12 @@
     return `${sign}${change}%`;
   }
 
-  function getTimeframeClasses(timeframe) {
-    const isSelected = selectedTimeframe === timeframe;
-    return isSelected
-      ? 'px-3 py-1 rounded-lg text-sm transition-colors bg-blue-600 text-white'
-      : 'px-3 py-1 rounded-lg text-sm transition-colors bg-slate-800 bg-opacity-50 hover:bg-slate-700 hover:bg-opacity-50';
-  }
+  $: getTimeframeClasses = (timeframe) => {
+  const isSelected = selectedTimeframe === timeframe;
+  return isSelected
+    ? 'px-3 py-1 rounded-lg text-sm transition-colors bg-blue-600 text-white'
+    : 'px-3 py-1 rounded-lg text-sm transition-colors bg-slate-800 bg-opacity-50 hover:bg-slate-700 hover:bg-opacity-50';
+};
 
   function drawChart() {
     if (!chartContainer) return;
@@ -217,7 +217,7 @@
       const lookback = getLookbackTime(selectedTimeframe);
       const startTime = Date.now() - lookback;
       
-      console.log('Loading chart data for', currentAsset.symbol, 'interval:', interval, 'lookback:', lookback / (1000 * 60 * 60), 'hours');
+      // console.log('Loading chart data for', currentAsset.symbol, 'interval:', interval, 'lookback:', lookback / (1000 * 60 * 60), 'hours');
 
       const snapshot = await infoClient.candleSnapshot({
         coin: currentAsset.symbol,
@@ -225,7 +225,7 @@
         startTime,
       });
 
-      console.log('Snapshot response:', snapshot);
+      // console.log('Snapshot response:', snapshot);
 
       // Handle different response structures
       const candles = snapshot?.candles || snapshot || [];
@@ -245,7 +245,7 @@
         volume: parseFloat(c.v || c.volume || 0),
       }));
 
-      console.log('Processed chart data:', chartData.length, 'points');
+      // console.log('Processed chart data:', chartData.length, 'points');
       
       // Trigger chart redraw
       drawChart();
@@ -268,20 +268,20 @@
   }
 
   // Update last data point with current price from assets store
-  $: if (chartData.length && currentAsset?.price) {
-    // Update the last point with the current live price
-    const updatedData = [...chartData];
-    updatedData[updatedData.length - 1] = {
-      ...updatedData[updatedData.length - 1],
-      price: currentAsset.price,
-    };
-    chartData = updatedData;
-  }
+  // $: if (chartData.length && currentAsset?.price) {
+  //   // Update the last point with the current live price
+  //   const updatedData = [...chartData];
+  //   updatedData[updatedData.length - 1] = {
+  //     ...updatedData[updatedData.length - 1],
+  //     price: currentAsset.price,
+  //   };
+  //   chartData = updatedData;
+  // }
 
   // Redraw chart when data changes
-  $: if (chartData.length && chartContainer) {
-    drawChart();
-  }
+  // $: if (chartData.length && chartContainer) {
+  //   drawChart();
+  // }
 
   // Redraw when hovering
   $: if (hoveredPoint !== null) {
@@ -331,6 +331,7 @@
             class={getTimeframeClasses(timeframe)}
           >
             {timeframe}
+            
           </button>
         {/each}
       </div>
@@ -349,10 +350,10 @@
       on:mousemove={handleMouseMove}
       on:mouseleave={handleMouseLeave}
     ></canvas>
-    {#if loading}
+    <!-- {#if loading}
       <div class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
         <span class="text-white">Loading...</span>
       </div>
-    {/if}
+    {/if} -->
   </div>
 </div>

@@ -1,5 +1,6 @@
 <script>
-  import { orderType, side, amount, price, selectedAsset,getL2Book } from '../stores/app.js';
+  import { orderType, side, amount, price, assets, selectedAsset, getL2Book } from '../stores/app.js';
+  import { onMount } from 'svelte';
 
   function handleTrade() {
     console.log('Executing trade:', {
@@ -12,24 +13,87 @@
     // Implement trade execution logic here
   }
 
-  // Generate mock order book data
-  const generateOrderBook = () => {
-    const basePrice = 2845.32;
-    const asks = Array.from({ length: 5 }, (_, i) => ({
-      price: basePrice + (5-i) * 0.5,
-      size: (Math.random() * 10).toFixed(3)
-    }));
-    const bids = Array.from({ length: 5 }, (_, i) => ({
-      price: basePrice - (i+1) * 0.5,
-      size: (Math.random() * 10).toFixed(3)
-    }));
-    return { asks, bids, spread: 0.50 };
+  const generateOrderBook = (l2Data) => {
+    // l2Data structure: { coin, time, levels: [bids, asks] }
+    
+    if (!l2Data || !l2Data.levels || l2Data.levels.length < 2) {
+      return { asks: [], bids: [], spread: 0 };
+    }
+    
+    const bids = l2Data.levels[0]
+      .map(level => ({
+        price: parseFloat(level.px),
+        size: parseFloat(level.sz),
+        numOrders: level.n
+      }))
+      .sort((a, b) => b.price - a.price); // Sort descending (highest first)
+    
+    const asks = l2Data.levels[1]
+      .map(level => ({
+        price: parseFloat(level.px),
+        size: parseFloat(level.sz),
+        numOrders: level.n
+      }))
+      .sort((a, b) => a.price - b.price); // Sort ascending (lowest first)
+    
+    // Calculate spread (difference between best ask and best bid)
+    const spread = asks.length && bids.length 
+      ? parseFloat((asks[0].price - bids[0].price).toFixed(6))
+      : 0;
+    
+    return { 
+      asks, 
+      bids, 
+      spread: spread,
+      timestamp: l2Data.time 
+    };
   };
 
-  $: orderBook = generateOrderBook();
-  const ob = getL2Book();
+  let orderBook = { asks: [], bids: [], spread: 0 };
+  let orderBookDepth = 10;
+  
+  $: currentAsset = $assets.find(a => a.symbol === $selectedAsset);
 
-  // Dynamic classes
+  const formatPrice = (price) => {
+    if (price == null || isNaN(price)) return '0.00';
+    if (price < 1) return price.toFixed(4);
+    return price.toFixed(2);
+  };
+
+  const formatSize = (size) => {
+    if (size == null || isNaN(size)) return '0.00';
+    return size.toFixed(2);
+  };
+
+  // Calculate max size for bar width calculation
+  $: maxSize = Math.max(
+    ...orderBook.asks.slice(0, orderBookDepth).map(a => a.size || 0),
+    ...orderBook.bids.slice(0, orderBookDepth).map(b => b.size || 0)
+  );
+
+  const getBarWidth = (size) => {
+    if (!size || !maxSize) return 0;
+    return (size / maxSize) * 100;
+  };
+
+  const loadOrderBook = async (symbol) => {
+    try {
+      const ob = await getL2Book(symbol);
+      // console.log('Raw API response:', ob);
+      orderBook = generateOrderBook(ob);
+      // console.log('Processed order book:', orderBook);
+    } catch (error) {
+      console.error('Error loading order book:', error);
+      // Reset to empty on error
+      orderBook = { asks: [], bids: [], spread: 0 };
+    }
+  };
+  
+  $: if (currentAsset) {
+    loadOrderBook(currentAsset.symbol);
+  }
+
+  // Dynamic classes for buy/sell buttons
   $: buySideClasses = $side === 'buy'
     ? 'flex-1 py-3 rounded-md font-medium transition-all bg-green-600 text-white shadow-lg'
     : 'flex-1 py-3 rounded-md font-medium transition-all text-slate-400 hover:text-white';
@@ -47,6 +111,16 @@
   $: tradeButtonClasses = $side === 'buy'
     ? 'w-full py-4 rounded-lg font-semibold text-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800'
     : 'w-full py-4 rounded-lg font-semibold text-lg transition-all shadow-lg hover:shadow-xl transform hover:scale-105 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800';
+
+  // Refresh order book periodically
+  onMount(() => {
+    const interval = setInterval(() => {
+      if (currentAsset) {
+        loadOrderBook(currentAsset.symbol);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  });
 </script>
 
 <div class="bg-black bg-opacity-20 backdrop-blur-xl rounded-xl p-6 border border-slate-700 border-opacity-30">
@@ -138,27 +212,33 @@
     <div class="flex-1">
       <h4 class="font-semibold mb-4">Order Book</h4>
       <div class="space-y-1 text-sm">
-        <!-- Asks (Sell Orders) -->
+        <!-- Asks (Sell Orders) - sellside class for red -->
         <div class="space-y-1">
-          {#each orderBook.asks as ask}
-            <div class="flex justify-between text-red-400 px-2 py-1 rounded hover:bg-slate-800 hover:bg-opacity-30 cursor-pointer transition-colors">
-              <span>{ask.price.toFixed(2)}</span>
-              <span>{ask.size}</span>
+          {#each orderBook.asks.slice(0, orderBookDepth).reverse() as ask}
+            <div class="order-row sellside px-2 py-1 rounded hover:bg-slate-800 hover:bg-opacity-30 cursor-pointer transition-colors">
+              <div class="size-bar sellside-bar" style="width: {getBarWidth(ask.size)}%"></div>
+              <div class="flex justify-between relative z-10">
+                <span>{formatPrice(ask.price)}</span>
+                <span>{formatSize(ask.size)}</span>
+              </div>
             </div>
           {/each}
         </div>
         
         <!-- Spread -->
         <div class="border-t border-b border-slate-700 border-opacity-30 py-2 text-center text-slate-400 font-mono text-xs">
-          Spread: ${orderBook.spread.toFixed(2)}
+          Spread: ${formatPrice(orderBook.spread)}
         </div>
         
-        <!-- Bids (Buy Orders) -->
+        <!-- Bids (Buy Orders) - buyside class for green -->
         <div class="space-y-1">
-          {#each orderBook.bids as bid}
-            <div class="flex justify-between text-green-400 px-2 py-1 rounded hover:bg-slate-800 hover:bg-opacity-30 cursor-pointer transition-colors">
-              <span>{bid.price.toFixed(2)}</span>
-              <span>{bid.size}</span>
+          {#each orderBook.bids.slice(0, orderBookDepth) as bid}
+            <div class="order-row buyside px-2 py-1 rounded hover:bg-slate-800 hover:bg-opacity-30 cursor-pointer transition-colors">
+              <div class="size-bar buyside-bar" style="width: {getBarWidth(bid.size)}%"></div>
+              <div class="flex justify-between relative z-10">
+                <span>{formatPrice(bid.price)}</span>
+                <span>{formatSize(bid.size)}</span>
+              </div>
             </div>
           {/each}
         </div>
@@ -166,4 +246,39 @@
     </div>
   </div>
 </div>
-          
+
+<style>
+  .buyside {
+    color: #4ade80; /* green-400 */
+  }
+  
+  .sellside {
+    color: #f87171; /* red-400 */
+  }
+
+  .order-row {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .size-bar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    transition: width 0.3s ease;
+    opacity: 0.15;
+  }
+
+  .buyside-bar {
+    background: linear-gradient(to left, #4ade80, transparent);
+  }
+
+  .sellside-bar {
+    background: linear-gradient(to left, #f87171, transparent);
+  }
+
+  .order-row:hover .size-bar {
+    opacity: 0.25;
+  }
+</style>
